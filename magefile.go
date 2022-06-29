@@ -24,7 +24,7 @@ const (
 
 	goProtocGenGo     = "google.golang.org/protobuf/cmd/protoc-gen-go@v1.28"
 	goProtocGenGoGRPC = "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2"
-	goLicenserRepo    = "github.com/elastic/go-licenser@v0.4.0"
+	goLicenserRepo    = "github.com/elastic/go-licenser@v0.4.1"
 )
 
 var (
