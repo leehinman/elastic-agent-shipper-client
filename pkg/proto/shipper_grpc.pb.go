@@ -42,8 +42,8 @@ type ProducerClient interface {
 	// The order in which concurrent requests complete is not guaranteed. Use sequential requests to
 	// control ordering.
 	PublishEvents(ctx context.Context, in *messages.PublishRequest, opts ...grpc.CallOption) (*messages.PublishReply, error)
-	// Returns a stream of acknowledgements from outputs.
-	StreamAcknowledgements(ctx context.Context, in *messages.StreamAcksRequest, opts ...grpc.CallOption) (Producer_StreamAcknowledgementsClient, error)
+	// Returns the shipper's uuid and its position in the event stream.
+	Info(ctx context.Context, in *messages.InfoRequest, opts ...grpc.CallOption) (Producer_InfoClient, error)
 }
 
 type producerClient struct {
@@ -63,12 +63,12 @@ func (c *producerClient) PublishEvents(ctx context.Context, in *messages.Publish
 	return out, nil
 }
 
-func (c *producerClient) StreamAcknowledgements(ctx context.Context, in *messages.StreamAcksRequest, opts ...grpc.CallOption) (Producer_StreamAcknowledgementsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Producer_ServiceDesc.Streams[0], "/elastic.agent.shipper.v1.Producer/StreamAcknowledgements", opts...)
+func (c *producerClient) Info(ctx context.Context, in *messages.InfoRequest, opts ...grpc.CallOption) (Producer_InfoClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Producer_ServiceDesc.Streams[0], "/elastic.agent.shipper.v1.Producer/Info", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &producerStreamAcknowledgementsClient{stream}
+	x := &producerInfoClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -78,17 +78,17 @@ func (c *producerClient) StreamAcknowledgements(ctx context.Context, in *message
 	return x, nil
 }
 
-type Producer_StreamAcknowledgementsClient interface {
-	Recv() (*messages.StreamAcksReply, error)
+type Producer_InfoClient interface {
+	Recv() (*messages.InfoReply, error)
 	grpc.ClientStream
 }
 
-type producerStreamAcknowledgementsClient struct {
+type producerInfoClient struct {
 	grpc.ClientStream
 }
 
-func (x *producerStreamAcknowledgementsClient) Recv() (*messages.StreamAcksReply, error) {
-	m := new(messages.StreamAcksReply)
+func (x *producerInfoClient) Recv() (*messages.InfoReply, error) {
+	m := new(messages.InfoReply)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -114,8 +114,8 @@ type ProducerServer interface {
 	// The order in which concurrent requests complete is not guaranteed. Use sequential requests to
 	// control ordering.
 	PublishEvents(context.Context, *messages.PublishRequest) (*messages.PublishReply, error)
-	// Returns a stream of acknowledgements from outputs.
-	StreamAcknowledgements(*messages.StreamAcksRequest, Producer_StreamAcknowledgementsServer) error
+	// Returns the shipper's uuid and its position in the event stream.
+	Info(*messages.InfoRequest, Producer_InfoServer) error
 	mustEmbedUnimplementedProducerServer()
 }
 
@@ -126,8 +126,8 @@ type UnimplementedProducerServer struct {
 func (UnimplementedProducerServer) PublishEvents(context.Context, *messages.PublishRequest) (*messages.PublishReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishEvents not implemented")
 }
-func (UnimplementedProducerServer) StreamAcknowledgements(*messages.StreamAcksRequest, Producer_StreamAcknowledgementsServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamAcknowledgements not implemented")
+func (UnimplementedProducerServer) Info(*messages.InfoRequest, Producer_InfoServer) error {
+	return status.Errorf(codes.Unimplemented, "method Info not implemented")
 }
 func (UnimplementedProducerServer) mustEmbedUnimplementedProducerServer() {}
 
@@ -160,24 +160,24 @@ func _Producer_PublishEvents_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Producer_StreamAcknowledgements_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(messages.StreamAcksRequest)
+func _Producer_Info_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(messages.InfoRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(ProducerServer).StreamAcknowledgements(m, &producerStreamAcknowledgementsServer{stream})
+	return srv.(ProducerServer).Info(m, &producerInfoServer{stream})
 }
 
-type Producer_StreamAcknowledgementsServer interface {
-	Send(*messages.StreamAcksReply) error
+type Producer_InfoServer interface {
+	Send(*messages.InfoReply) error
 	grpc.ServerStream
 }
 
-type producerStreamAcknowledgementsServer struct {
+type producerInfoServer struct {
 	grpc.ServerStream
 }
 
-func (x *producerStreamAcknowledgementsServer) Send(m *messages.StreamAcksReply) error {
+func (x *producerInfoServer) Send(m *messages.InfoReply) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -195,8 +195,8 @@ var Producer_ServiceDesc = grpc.ServiceDesc{
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamAcknowledgements",
-			Handler:       _Producer_StreamAcknowledgements_Handler,
+			StreamName:    "Info",
+			Handler:       _Producer_Info_Handler,
 			ServerStreams: true,
 		},
 	},
