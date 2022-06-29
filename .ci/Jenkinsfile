@@ -36,7 +36,6 @@ pipeline {
     stage('Update') {
       options { skipDefaultCheckout() }
       steps {
-        cleanup()
         withMageEnv(){
           sh '''
           curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.19.4/protoc-3.19.4-linux-x86_64.zip
@@ -51,7 +50,6 @@ pipeline {
     stage('Check') {
       options { skipDefaultCheckout() }
       steps {
-        cleanup()
         withMageEnv(){
           dir("${BASE_DIR}"){
             sh(label: 'Checks formatting / linting',script: 'mage -debug check')
