@@ -14,12 +14,15 @@ import (
 	"path"
 
 	devtools "github.com/elastic/elastic-agent-libs/dev-tools/mage"
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
 
 const (
-	protoDest = "./pkg/proto"
+	protoDest         = "./pkg/proto"
+	goProtocGenGo     = "google.golang.org/protobuf/cmd/protoc-gen-go@v1.28"
+	goProtocGenGoGRPC = "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2"
 )
 
 var (
@@ -46,8 +49,22 @@ var (
 	}
 )
 
+// InstallProtoGo installs required plugins for protoc
+func InstallProtoGo() error {
+	err := gotool.Install(gotool.Install.Package(goProtocGenGo))
+	if err != nil {
+		return err
+	}
+	err = gotool.Install(gotool.Install.Package(goProtocGenGoGRPC))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Update regenerates the Go files out of .proto files
 func Update() error {
+	mg.Deps(InstallProtoGo)
 	var (
 		importFlags []string
 		toCompile   []string
