@@ -42,7 +42,7 @@ pipeline {
           unzip protoc.zip
           '''
           dir("${BASE_DIR}"){
-            sh(label: 'Generate GRPC code',script: 'mage -debug update')
+            sh(label: 'Generate GRPC code',script: 'mage -v update')
           }
         }
       }
@@ -52,7 +52,7 @@ pipeline {
       steps {
         withMageEnv(){
           dir("${BASE_DIR}"){
-            sh(label: 'Checks formatting / linting',script: 'mage -debug check')
+            sh(label: 'Checks formatting / linting',script: 'mage -v check')
           }
         }
       }
