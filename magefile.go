@@ -20,9 +20,11 @@ import (
 )
 
 const (
-	protoDest         = "./pkg/proto"
+	protoDest = "./pkg/proto"
+
 	goProtocGenGo     = "google.golang.org/protobuf/cmd/protoc-gen-go@v1.28"
 	goProtocGenGoGRPC = "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2"
+	goLicenserRepo    = "github.com/elastic/go-licenser@v0.4.0"
 )
 
 var (
@@ -49,6 +51,11 @@ var (
 	}
 )
 
+// Update updates all the generated code out of the spec
+func Update() {
+	mg.SerialDeps(GenereateGo, License)
+}
+
 // InstallProtoGo installs required plugins for protoc
 func InstallProtoGo() error {
 	err := gotool.Install(gotool.Install.Package(goProtocGenGo))
@@ -62,9 +69,16 @@ func InstallProtoGo() error {
 	return nil
 }
 
-// Update regenerates the Go files out of .proto files
-func Update() error {
+// InstallLicenser installs the go-licenser.
+// For some reason `devtools.InstallGoLicenser` fails with strange errors, this solution is stable.
+func InstallLicenser() error {
+	return gotool.Install(gotool.Install.Package(goLicenserRepo))
+}
+
+// GenerateProto regenerates the Go files out of .proto files
+func GenereateGo() error {
 	mg.Deps(InstallProtoGo)
+
 	var (
 		importFlags []string
 		toCompile   []string
@@ -107,27 +121,26 @@ func Update() error {
 		return fmt.Errorf("failed to compile protobuf: %w", err)
 	}
 
-	log.Println("Adding license headers...")
+	return nil
+}
 
-	return License()
+// Check runs all the checks
+func Check() {
+	mg.Deps(devtools.Deps.CheckModuleTidy, CheckLicenseHeaders)
+	mg.Deps(devtools.CheckNoChanges)
 }
 
 // License applies the right license header.
 func License() error {
-	mg.Deps(devtools.InstallGoLicenser)
-	return licenser(rewriteHeader)
-}
+	mg.Deps(InstallLicenser)
+	log.Println("Adding license headers...")
 
-// Check runs all the checks
-func Check() error {
-	mg.Deps(devtools.Deps.CheckModuleTidy, CheckLicenseHeaders)
-	mg.Deps(devtools.CheckNoChanges)
-	return nil
+	return licenser(rewriteHeader)
 }
 
 // CheckLicenseHeaders checks ASL2 headers in .go files
 func CheckLicenseHeaders() error {
-	mg.Deps(devtools.InstallGoLicenser)
+	mg.Deps(InstallLicenser)
 	return licenser(checkHeader)
 }
 
