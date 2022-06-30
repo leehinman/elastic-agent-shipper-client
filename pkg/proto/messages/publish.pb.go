@@ -33,7 +33,7 @@ type PublishRequest struct {
 	// Optional. If present, this request will only be accepted if the uuid
 	// matches the current uuid of the shipper process. The uuid identifies
 	// the current shipper process, and is updated when the shipper restarts.
-	// Its current value is returned in every shipper API call.
+	// Its current value is returned in every shipper API reply.
 	// A uuid in a PublishRequest is used for enforcing at-least-once delivery
 	// guarantees: inputs may include the known shipper uuid with their request,
 	// ensuring it will be rejected if the shipper restarts. In this case the
