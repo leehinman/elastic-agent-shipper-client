@@ -8,7 +8,7 @@ option go_package = "github.com/elastic/elastic-agent-shipper-client/pkg/proto";
 package elastic.agent.shipper.v1;
 
 import "messages/publish.proto";
-import "messages/info.proto";
+import "messages/persisted_index.proto";
 
 service Producer {
  // Publishes a list of events via the Elastic agent shipper.
@@ -27,5 +27,5 @@ service Producer {
  // control ordering.
  rpc PublishEvents(messages.PublishRequest) returns (messages.PublishReply);
  // Returns the shipper's uuid and its position in the event stream.
- rpc Info(messages.InfoRequest) returns (stream messages.InfoReply);
+ rpc PersistedIndex(messages.PersistedIndexRequest) returns (stream messages.PersistedIndexReply);
 }

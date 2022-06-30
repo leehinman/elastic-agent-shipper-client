@@ -31,12 +31,14 @@ type PublishRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Optional. If present, this request will only be accepted if the uuid
-	// matches the current uuid of the shipper process. This is used for
-	// enforcing at-least-once delivery guarantees during error recovery.
-	// Inputs that implement this should include the known shipper uuid with
-	// their request, and if there is a mismatch, should rewind to the last
-	// known-good position in their input stream.
-	// Note that this only arises during error states, since Agent only
+	// matches the current uuid of the shipper process. The uuid identifies
+	// the current shipper process, and is updated when the shipper restarts.
+	// Its current value is returned in every shipper API call.
+	// A uuid in a PublishRequest is used for enforcing at-least-once delivery
+	// guarantees: inputs may include the known shipper uuid with their request,
+	// ensuring it will be rejected if the shipper restarts. In this case the
+	// input should rewind to the last known-good position in its data sequence.
+	// Note that this issue only arises during error states, since Agent only
 	// restarts the shipper when its process is terminated or nonresponsive.
 	Uuid   string   `protobuf:"bytes,2,opt,name=uuid,proto3" json:"uuid,omitempty"`
 	Events []*Event `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
@@ -314,9 +316,9 @@ type PublishReply struct {
 	AcceptedCount int32 `protobuf:"varint,2,opt,name=accepted_count,json=acceptedCount,proto3" json:"accepted_count,omitempty"`
 	// The final internal index for the events that were accepted. Inputs that
 	// want to guarantee event persistence can do it with this field: when the
-	// persisted_index of a PublishReply or InfoReply is >= this value, the
-	// events from this publish request have been persisted and the input can
-	// safely advance.
+	// persisted_index of a PublishReply or PersistedIndexReply is >= this value,
+	// the events from this publish request have been persisted and the input can
+	// safely advance. See the API README for details.
 	AcceptedIndex int64 `protobuf:"varint,3,opt,name=accepted_index,json=acceptedIndex,proto3" json:"accepted_index,omitempty"`
 	// The highest sequential index that has been persisted. (See the API
 	// README for details on what "persisted" entails.)

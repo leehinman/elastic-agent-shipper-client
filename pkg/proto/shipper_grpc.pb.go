@@ -43,7 +43,7 @@ type ProducerClient interface {
 	// control ordering.
 	PublishEvents(ctx context.Context, in *messages.PublishRequest, opts ...grpc.CallOption) (*messages.PublishReply, error)
 	// Returns the shipper's uuid and its position in the event stream.
-	Info(ctx context.Context, in *messages.InfoRequest, opts ...grpc.CallOption) (Producer_InfoClient, error)
+	PersistedIndex(ctx context.Context, in *messages.PersistedIndexRequest, opts ...grpc.CallOption) (Producer_PersistedIndexClient, error)
 }
 
 type producerClient struct {
@@ -63,12 +63,12 @@ func (c *producerClient) PublishEvents(ctx context.Context, in *messages.Publish
 	return out, nil
 }
 
-func (c *producerClient) Info(ctx context.Context, in *messages.InfoRequest, opts ...grpc.CallOption) (Producer_InfoClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Producer_ServiceDesc.Streams[0], "/elastic.agent.shipper.v1.Producer/Info", opts...)
+func (c *producerClient) PersistedIndex(ctx context.Context, in *messages.PersistedIndexRequest, opts ...grpc.CallOption) (Producer_PersistedIndexClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Producer_ServiceDesc.Streams[0], "/elastic.agent.shipper.v1.Producer/PersistedIndex", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &producerInfoClient{stream}
+	x := &producerPersistedIndexClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -78,17 +78,17 @@ func (c *producerClient) Info(ctx context.Context, in *messages.InfoRequest, opt
 	return x, nil
 }
 
-type Producer_InfoClient interface {
-	Recv() (*messages.InfoReply, error)
+type Producer_PersistedIndexClient interface {
+	Recv() (*messages.PersistedIndexReply, error)
 	grpc.ClientStream
 }
 
-type producerInfoClient struct {
+type producerPersistedIndexClient struct {
 	grpc.ClientStream
 }
 
-func (x *producerInfoClient) Recv() (*messages.InfoReply, error) {
-	m := new(messages.InfoReply)
+func (x *producerPersistedIndexClient) Recv() (*messages.PersistedIndexReply, error) {
+	m := new(messages.PersistedIndexReply)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ type ProducerServer interface {
 	// control ordering.
 	PublishEvents(context.Context, *messages.PublishRequest) (*messages.PublishReply, error)
 	// Returns the shipper's uuid and its position in the event stream.
-	Info(*messages.InfoRequest, Producer_InfoServer) error
+	PersistedIndex(*messages.PersistedIndexRequest, Producer_PersistedIndexServer) error
 	mustEmbedUnimplementedProducerServer()
 }
 
@@ -126,8 +126,8 @@ type UnimplementedProducerServer struct {
 func (UnimplementedProducerServer) PublishEvents(context.Context, *messages.PublishRequest) (*messages.PublishReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishEvents not implemented")
 }
-func (UnimplementedProducerServer) Info(*messages.InfoRequest, Producer_InfoServer) error {
-	return status.Errorf(codes.Unimplemented, "method Info not implemented")
+func (UnimplementedProducerServer) PersistedIndex(*messages.PersistedIndexRequest, Producer_PersistedIndexServer) error {
+	return status.Errorf(codes.Unimplemented, "method PersistedIndex not implemented")
 }
 func (UnimplementedProducerServer) mustEmbedUnimplementedProducerServer() {}
 
@@ -160,24 +160,24 @@ func _Producer_PublishEvents_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Producer_Info_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(messages.InfoRequest)
+func _Producer_PersistedIndex_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(messages.PersistedIndexRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(ProducerServer).Info(m, &producerInfoServer{stream})
+	return srv.(ProducerServer).PersistedIndex(m, &producerPersistedIndexServer{stream})
 }
 
-type Producer_InfoServer interface {
-	Send(*messages.InfoReply) error
+type Producer_PersistedIndexServer interface {
+	Send(*messages.PersistedIndexReply) error
 	grpc.ServerStream
 }
 
-type producerInfoServer struct {
+type producerPersistedIndexServer struct {
 	grpc.ServerStream
 }
 
-func (x *producerInfoServer) Send(m *messages.InfoReply) error {
+func (x *producerPersistedIndexServer) Send(m *messages.PersistedIndexReply) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -195,8 +195,8 @@ var Producer_ServiceDesc = grpc.ServiceDesc{
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Info",
-			Handler:       _Producer_Info_Handler,
+			StreamName:    "PersistedIndex",
+			Handler:       _Producer_PersistedIndex_Handler,
 			ServerStreams: true,
 		},
 	},

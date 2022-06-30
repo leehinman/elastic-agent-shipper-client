@@ -7,19 +7,18 @@ syntax = "proto3";
 option go_package = "github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages";
 package elastic.agent.shipper.v1.messages;
 
-message InfoRequest {
+// A request for latest sequential event index that has been persisted to the
+// disk or the outputs. This is only needed for inputs that must maintain their
+// position in some persistent data sequence between restarts.
+message PersistedIndexRequest {
 }
 
-message InfoReply {
+message PersistedIndexReply {
  // The uuid of the shipper process, generated on startup. Clients can use this
  // to detect when the shipper restarts.
  string uuid = 1;
 
- // The most recent index assigned to an event accepted by the shipper. This
- // is always at least as high as persisted_index.
- int64 accepted_index = 2;
-
  // The highest sequential index that has been persisted. (See the API
  // README for details on what "persisted" entails.)
- int64 persisted_index = 3;
+ int64 persisted_index = 2;
 }
