@@ -8,10 +8,21 @@ option go_package = "github.com/elastic/elastic-agent-shipper-client/pkg/proto/m
 package elastic.agent.shipper.v1.messages;
 
 import "google/protobuf/timestamp.proto";
-import "google/rpc/status.proto";
 import "messages/struct.proto";
 
 message PublishRequest {
+ // Optional. If present, this request will only be accepted if the uuid
+ // matches the current uuid of the shipper process. The uuid identifies
+ // the current shipper process, and is updated when the shipper restarts.
+ // Its current value is returned in every shipper API reply.
+ // A uuid in a PublishRequest is used for enforcing at-least-once delivery
+ // guarantees: inputs may include the known shipper uuid with their request,
+ // ensuring it will be rejected if the shipper restarts. In this case the
+ // input should rewind to the last known-good position in its data sequence.
+ // Note that this issue only arises during error states, since Agent only
+ // restarts the shipper when its process is terminated or nonresponsive.
+ string uuid = 2;
+
  repeated Event events = 1;
 }
 
@@ -21,10 +32,6 @@ message Event {
  google.protobuf.Timestamp timestamp = 1;
  // Source of the generated event.
  Source source = 2;
- // Optional. Producers may specify a unique event ID if the event has a natural unique
- // identifier to simplify acknowledgement tracking. If no such identifier exists, the queue
- // offset can be used for acknowledgement tracking.
- string event_id = 3;
  // Data stream for the event.
  DataStream data_stream = 4;
  // Metadata JSON object (map[string]google.protobuf.Value)
@@ -54,23 +61,23 @@ message DataStream {
 }
 
 message PublishReply {
- // Results describing messages successfully published to the queue.
- //
- // The output order matches the input order e.g. `results[N]` maps to `events[N]`,
- // however, `results` may contain only the first K results for `events`, when
- // not all the events are accepted by the queue, so the list sizes may not match.
- repeated EventResult results = 1;
-}
+ // The uuid of the shipper process, generated on startup. Clients can use this
+ // to detect when the shipper restarts.
+ string uuid = 1;
 
-message EventResult {
- // Timestamp of the event that was published.
- google.protobuf.Timestamp timestamp = 1;
- // ID derived from the queue offset that uniquely identifies the event within the shipper
- // system. Used to track the progress of events through the queue system.
- string queue_id = 2;
- // Optional. Event ID provided when the event was published, if it exists.
- string event_id = 3;
- // Optional. List of errors encountered by processors, if any. Processor
- // errors do not indicate the message failed to send.
- repeated google.rpc.Status processor_errors = 4;
+ // The number of events accepted by the shipper, in the same order as the
+ // PublishRequest. If uuid in the reply differs from uuid in the request,
+ // then accepted_count is always zero.
+ int32 accepted_count = 2;
+
+ // The final internal index for the events that were accepted. Inputs that
+ // want to guarantee event persistence can do it with this field: when the
+ // persisted_index of a PublishReply or PersistedIndexReply is >= this value,
+ // the events from this publish request have been persisted and the input can
+ // safely advance. See the API README for details.
+ int64 accepted_index = 3;
+
+ // The highest sequential index that has been persisted. (See the API
+ // README for details on what "persisted" entails.)
+ int64 persisted_index = 4;
 }

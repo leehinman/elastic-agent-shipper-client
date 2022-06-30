@@ -42,8 +42,8 @@ type ProducerClient interface {
 	// The order in which concurrent requests complete is not guaranteed. Use sequential requests to
 	// control ordering.
 	PublishEvents(ctx context.Context, in *messages.PublishRequest, opts ...grpc.CallOption) (*messages.PublishReply, error)
-	// Returns a stream of acknowledgements from outputs.
-	StreamAcknowledgements(ctx context.Context, in *messages.StreamAcksRequest, opts ...grpc.CallOption) (Producer_StreamAcknowledgementsClient, error)
+	// Returns the shipper's uuid and its position in the event stream.
+	PersistedIndex(ctx context.Context, in *messages.PersistedIndexRequest, opts ...grpc.CallOption) (Producer_PersistedIndexClient, error)
 }
 
 type producerClient struct {
@@ -63,12 +63,12 @@ func (c *producerClient) PublishEvents(ctx context.Context, in *messages.Publish
 	return out, nil
 }
 
-func (c *producerClient) StreamAcknowledgements(ctx context.Context, in *messages.StreamAcksRequest, opts ...grpc.CallOption) (Producer_StreamAcknowledgementsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Producer_ServiceDesc.Streams[0], "/elastic.agent.shipper.v1.Producer/StreamAcknowledgements", opts...)
+func (c *producerClient) PersistedIndex(ctx context.Context, in *messages.PersistedIndexRequest, opts ...grpc.CallOption) (Producer_PersistedIndexClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Producer_ServiceDesc.Streams[0], "/elastic.agent.shipper.v1.Producer/PersistedIndex", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &producerStreamAcknowledgementsClient{stream}
+	x := &producerPersistedIndexClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -78,17 +78,17 @@ func (c *producerClient) StreamAcknowledgements(ctx context.Context, in *message
 	return x, nil
 }
 
-type Producer_StreamAcknowledgementsClient interface {
-	Recv() (*messages.StreamAcksReply, error)
+type Producer_PersistedIndexClient interface {
+	Recv() (*messages.PersistedIndexReply, error)
 	grpc.ClientStream
 }
 
-type producerStreamAcknowledgementsClient struct {
+type producerPersistedIndexClient struct {
 	grpc.ClientStream
 }
 
-func (x *producerStreamAcknowledgementsClient) Recv() (*messages.StreamAcksReply, error) {
-	m := new(messages.StreamAcksReply)
+func (x *producerPersistedIndexClient) Recv() (*messages.PersistedIndexReply, error) {
+	m := new(messages.PersistedIndexReply)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -114,8 +114,8 @@ type ProducerServer interface {
 	// The order in which concurrent requests complete is not guaranteed. Use sequential requests to
 	// control ordering.
 	PublishEvents(context.Context, *messages.PublishRequest) (*messages.PublishReply, error)
-	// Returns a stream of acknowledgements from outputs.
-	StreamAcknowledgements(*messages.StreamAcksRequest, Producer_StreamAcknowledgementsServer) error
+	// Returns the shipper's uuid and its position in the event stream.
+	PersistedIndex(*messages.PersistedIndexRequest, Producer_PersistedIndexServer) error
 	mustEmbedUnimplementedProducerServer()
 }
 
@@ -126,8 +126,8 @@ type UnimplementedProducerServer struct {
 func (UnimplementedProducerServer) PublishEvents(context.Context, *messages.PublishRequest) (*messages.PublishReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishEvents not implemented")
 }
-func (UnimplementedProducerServer) StreamAcknowledgements(*messages.StreamAcksRequest, Producer_StreamAcknowledgementsServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamAcknowledgements not implemented")
+func (UnimplementedProducerServer) PersistedIndex(*messages.PersistedIndexRequest, Producer_PersistedIndexServer) error {
+	return status.Errorf(codes.Unimplemented, "method PersistedIndex not implemented")
 }
 func (UnimplementedProducerServer) mustEmbedUnimplementedProducerServer() {}
 
@@ -160,24 +160,24 @@ func _Producer_PublishEvents_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Producer_StreamAcknowledgements_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(messages.StreamAcksRequest)
+func _Producer_PersistedIndex_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(messages.PersistedIndexRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(ProducerServer).StreamAcknowledgements(m, &producerStreamAcknowledgementsServer{stream})
+	return srv.(ProducerServer).PersistedIndex(m, &producerPersistedIndexServer{stream})
 }
 
-type Producer_StreamAcknowledgementsServer interface {
-	Send(*messages.StreamAcksReply) error
+type Producer_PersistedIndexServer interface {
+	Send(*messages.PersistedIndexReply) error
 	grpc.ServerStream
 }
 
-type producerStreamAcknowledgementsServer struct {
+type producerPersistedIndexServer struct {
 	grpc.ServerStream
 }
 
-func (x *producerStreamAcknowledgementsServer) Send(m *messages.StreamAcksReply) error {
+func (x *producerPersistedIndexServer) Send(m *messages.PersistedIndexReply) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -195,8 +195,8 @@ var Producer_ServiceDesc = grpc.ServiceDesc{
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamAcknowledgements",
-			Handler:       _Producer_StreamAcknowledgements_Handler,
+			StreamName:    "PersistedIndex",
+			Handler:       _Producer_PersistedIndex_Handler,
 			ServerStreams: true,
 		},
 	},
