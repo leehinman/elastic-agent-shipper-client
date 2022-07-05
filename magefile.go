@@ -48,6 +48,7 @@ var (
 		"api/vendor",
 		"api/messages/struct.proto",
 		"pkg/proto/messages/struct.pb.go",
+		"pkg/helpers/struct.go",
 	}
 )
 

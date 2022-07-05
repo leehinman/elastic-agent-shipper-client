@@ -70,7 +70,7 @@ message Value {
     // Represents a repeated `Value`.
     ListValue list_value = 6;
     // Represents a timestamp.
-    google.protobuf.Timestamp timestamp = 7;
+    google.protobuf.Timestamp timestamp_value = 7;
   }
 }
 
