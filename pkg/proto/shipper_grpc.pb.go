@@ -29,20 +29,15 @@ const _ = grpc.SupportPackageIsVersion7
 type ProducerClient interface {
 	// Publishes a list of events via the Elastic agent shipper.
 	// Blocks until all processing steps complete and data is written to the queue.
-	// The order of `PublishRequest.events` always matches `PublishReply.results`.
 	//
-	// Returns the `codes.ResourceExhausted` gRPC status code if the queue is full and none of the events
-	// can be accepted at the moment.
+	// If the queue could not accept some events from the request, this returns a successful response
+	// containing a count of events that were accepted by the queue.
+	// The client is expected to retry sending the rest of the events in a separate request.
 	//
-	// If the queue could accept some events from the request, this returns a successful response
-	// containing results for the first K events that were accepted by the queue.
-	// The client is expected to retry sending the rest of the events in a separate request later.
-	//
-	// Inputs may execute multiple concurrent Produce requests for independent data streams.
-	// The order in which concurrent requests complete is not guaranteed. Use sequential requests to
-	// control ordering.
+	// The client is also expected to have some kind of backoff strategy
+	//	in case of a reply with an accepted count < the amount of sent events.
 	PublishEvents(ctx context.Context, in *messages.PublishRequest, opts ...grpc.CallOption) (*messages.PublishReply, error)
-	// Returns the shipper's uuid and its position in the event stream.
+	// Returns the shipper's uuid and its current position in the event stream (persisted index).
 	PersistedIndex(ctx context.Context, in *messages.PersistedIndexRequest, opts ...grpc.CallOption) (Producer_PersistedIndexClient, error)
 }
 
@@ -101,20 +96,15 @@ func (x *producerPersistedIndexClient) Recv() (*messages.PersistedIndexReply, er
 type ProducerServer interface {
 	// Publishes a list of events via the Elastic agent shipper.
 	// Blocks until all processing steps complete and data is written to the queue.
-	// The order of `PublishRequest.events` always matches `PublishReply.results`.
 	//
-	// Returns the `codes.ResourceExhausted` gRPC status code if the queue is full and none of the events
-	// can be accepted at the moment.
+	// If the queue could not accept some events from the request, this returns a successful response
+	// containing a count of events that were accepted by the queue.
+	// The client is expected to retry sending the rest of the events in a separate request.
 	//
-	// If the queue could accept some events from the request, this returns a successful response
-	// containing results for the first K events that were accepted by the queue.
-	// The client is expected to retry sending the rest of the events in a separate request later.
-	//
-	// Inputs may execute multiple concurrent Produce requests for independent data streams.
-	// The order in which concurrent requests complete is not guaranteed. Use sequential requests to
-	// control ordering.
+	// The client is also expected to have some kind of backoff strategy
+	//	in case of a reply with an accepted count < the amount of sent events.
 	PublishEvents(context.Context, *messages.PublishRequest) (*messages.PublishReply, error)
-	// Returns the shipper's uuid and its position in the event stream.
+	// Returns the shipper's uuid and its current position in the event stream (persisted index).
 	PersistedIndex(*messages.PersistedIndexRequest, Producer_PersistedIndexServer) error
 	mustEmbedUnimplementedProducerServer()
 }

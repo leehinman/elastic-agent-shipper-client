@@ -20,5 +20,5 @@ message PersistedIndexReply {
 
  // The highest sequential index that has been persisted. (See the API
  // README for details on what "persisted" entails.)
- int64 persisted_index = 2;
+ uint64 persisted_index = 2;
 }
