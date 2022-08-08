@@ -11,6 +11,12 @@ package elastic.agent.shipper.v1.messages;
 // disk or the outputs. This is only needed for inputs that must maintain their
 // position in some persistent data sequence between restarts.
 message PersistedIndexRequest {
+ // The interval in milliseconds for checking the persisted index value during the subscription.
+ // An update is not sent if the value is unchanged, so it's not guaranteed to receive
+ // an update after each interval but rather to receive an update on the changed value
+ // in `polling_interval` time at most.
+ // When the value is zero the response is sent only once and the stream is closed right after.
+ uint64 polling_interval = 1;
 }
 
 message PersistedIndexReply {
