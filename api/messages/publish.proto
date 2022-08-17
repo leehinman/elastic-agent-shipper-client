@@ -74,12 +74,8 @@ message PublishReply {
 
  // The final internal index for the events that were accepted. Inputs that
  // want to guarantee event persistence can do it with this field: when the
- // persisted_index of a PublishReply or PersistedIndexReply is >= this value,
+ // persisted_index of PersistedIndexReply is >= this value,
  // the events from this publish request have been persisted and the input can
  // safely advance. See the API README for details.
  uint64 accepted_index = 3;
-
- // The highest sequential index that has been persisted. (See the API
- // README for details on what "persisted" entails.)
- uint64 persisted_index = 4;
 }
