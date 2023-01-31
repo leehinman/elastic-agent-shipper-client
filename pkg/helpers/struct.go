@@ -16,8 +16,7 @@
 // "google.golang.org/protobuf/encoding/protojson" package
 // ensures that they will be serialized as their JSON equivalent.
 //
-//
-// Conversion to and from a Go interface
+// # Conversion to and from a Go interface
 //
 // The standard Go "encoding/json" package has functionality to serialize
 // arbitrary types to a large degree. The Value.AsInterface, Struct.AsMap, and
@@ -30,8 +29,7 @@
 // forms back as Value, Struct, and ListValue messages, use the NewStruct,
 // NewList, and NewValue constructor functions.
 //
-//
-// Example usage
+// # Example usage
 //
 // Consider the following example JSON object:
 //
@@ -90,12 +88,13 @@
 //		... // handle error
 //	}
 //	... // make use of m as a *structpb.Value
-//
 package helpers
 
 import (
-	base64 "encoding/base64"
+	"encoding/base64"
+	"fmt"
 	"math"
+	"reflect"
 	"time"
 	utf8 "unicode/utf8"
 
@@ -208,49 +207,80 @@ func AsSlice(x *messages.ListValue) []interface{} {
 // When converting an int64 or uint64 to a NumberValue, numeric precision loss
 // is possible since they are stored as a float64.
 func NewValue(v interface{}) (*messages.Value, error) {
-	switch v := v.(type) {
-	case nil:
+
+	if v == nil {
 		return NewNullValue(), nil
-	case bool:
-		return NewBoolValue(v), nil
-	case int:
-		return NewNumberValue(float64(v)), nil
-	case int32:
-		return NewNumberValue(float64(v)), nil
-	case int64:
-		return NewNumberValue(float64(v)), nil
-	case uint:
-		return NewNumberValue(float64(v)), nil
-	case uint32:
-		return NewNumberValue(float64(v)), nil
-	case uint64:
-		return NewNumberValue(float64(v)), nil
-	case float32:
-		return NewNumberValue(float64(v)), nil
-	case float64:
-		return NewNumberValue(float64(v)), nil
-	case string:
-		if !utf8.ValidString(v) {
+	}
+
+	switch reflect.TypeOf(v).Kind() {
+	case reflect.Bool:
+		return NewBoolValue(v.(bool)), nil
+	case reflect.Int:
+		return NewNumberValue(float64(v.(int))), nil
+	case reflect.Int32:
+		return NewNumberValue(float64(v.(int32))), nil
+	case reflect.Int64:
+		return NewNumberValue(float64(v.(int64))), nil
+	case reflect.Uint:
+		return NewNumberValue(float64(v.(uint))), nil
+	case reflect.Uint32:
+		return NewNumberValue(float64(v.(uint32))), nil
+	case reflect.Uint64:
+		return NewNumberValue(float64(v.(uint64))), nil
+	case reflect.Float32:
+		return NewNumberValue(float64(v.(float32))), nil
+	case reflect.Float64:
+		return NewNumberValue(v.(float64)), nil
+	case reflect.String:
+		refStr := v.(string)
+		if !utf8.ValidString(refStr) {
 			return nil, protoimpl.X.NewError("invalid UTF-8 in string: %q", v)
 		}
-		return NewStringValue(v), nil
-	case time.Time:
-		return NewTimestampValue(v), nil
-	case []byte:
-		s := base64.StdEncoding.EncodeToString(v)
-		return NewStringValue(s), nil
-	case map[string]interface{}:
-		v2, err := NewStruct(v)
-		if err != nil {
-			return nil, err
+		return NewStringValue(refStr), nil
+	case reflect.Struct:
+		// special case for time values
+		if tVal, ok := v.(time.Time); ok {
+			return NewTimestampValue(tVal), nil
 		}
-		return NewStructValue(v2), nil
-	case []interface{}:
-		v2, err := NewList(v)
-		if err != nil {
-			return nil, err
+		// should we try to handle struct values somehow?
+		return nil, protoimpl.X.NewError("invalid type: %T", v)
+
+	case reflect.Map:
+		reflected := map[string]interface{}{}
+		if mapV, ok := v.(map[string]interface{}); ok {
+			reflected = mapV
+		} else {
+			mapIter := reflect.ValueOf(v).MapRange()
+			for mapIter.Next() {
+				k := mapIter.Key().String() // This will expect a map of key type string; if we get other key types, there will be some weird values here. Not sure if we want to make that a hard error.
+				mv := mapIter.Value().Interface()
+				reflected[k] = mv
+			}
 		}
-		return NewListValue(v2), nil
+		structVal, err := NewStruct(reflected)
+		if err != nil {
+			return nil, protoimpl.X.NewError("could not convert value to struct: %s", err)
+		}
+		return NewStructValue(structVal), nil
+	case reflect.Slice:
+		// special case for byte encodings
+		if byteEnc, ok := v.([]byte); ok {
+			s := base64.StdEncoding.EncodeToString(byteEnc)
+			return NewStringValue(s), nil
+		}
+
+		refVal := reflect.ValueOf(v)
+		listVal := &messages.ListValue{Values: make([]*messages.Value, refVal.Len())}
+
+		for i := 0; i < refVal.Len(); i++ {
+			var err error
+			listVal.Values[i], err = NewValue(refVal.Index(i).Interface())
+			if err != nil {
+				return nil, fmt.Errorf("error unpacking field of type %T in array %#v: %s", refVal.Field(i).Interface(), v, err)
+			}
+		}
+
+		return NewListValue(listVal), nil
 	default:
 		return nil, protoimpl.X.NewError("invalid type: %T", v)
 	}
