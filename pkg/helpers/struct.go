@@ -99,6 +99,7 @@ import (
 	utf8 "unicode/utf8"
 
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
+	"github.com/mitchellh/mapstructure"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -242,8 +243,13 @@ func NewValue(v interface{}) (*messages.Value, error) {
 		if tVal, ok := v.(time.Time); ok {
 			return NewTimestampValue(tVal), nil
 		}
-		// should we try to handle struct values somehow?
-		return nil, protoimpl.X.NewError("invalid type: %T", v)
+		// fallback, attempt to convert struct values
+		interMap := map[string]interface{}{}
+		err := mapstructure.Decode(v, &interMap)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding struct: %w", err)
+		}
+		return NewValue(interMap)
 
 	case reflect.Map:
 		reflected := map[string]interface{}{}
@@ -282,6 +288,7 @@ func NewValue(v interface{}) (*messages.Value, error) {
 
 		return NewListValue(listVal), nil
 	default:
+
 		return nil, protoimpl.X.NewError("invalid type: %T", v)
 	}
 }

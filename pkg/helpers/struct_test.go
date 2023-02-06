@@ -10,7 +10,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var result *messages.Value
+
+func BenchmarkCustomUnmarshal(b *testing.B) {
+	testList := mapstr.M{
+		"field1": mapstr.M{
+			"value":     3,
+			"value-str": "test",
+		},
+	}
+	var r *messages.Value
+	var err error
+	// benchmark performance for the map, which will usually be the most complex type to marshal
+	// there's a handful of different possilbe ways to handle the NewValue conversion, so it's helpful
+	// to have a benchmark in case we decide to adjust this in the future
+	for i := 0; i < b.N; i++ {
+		r, err = NewValue(testList)
+		if err != nil {
+			b.Logf("error: %s", err)
+			b.FailNow()
+		}
+		result = r
+	}
+}
+
 func TestStructValue(t *testing.T) {
+	testStructType := struct {
+		A int
+		B string
+	}{
+		A: 5,
+		B: "test",
+	}
 	ts := time.Now()
 	cases := []struct {
 		name string
@@ -45,6 +76,14 @@ func TestStructValue(t *testing.T) {
 					"value":     NewNumberValue(3),
 					"value-str": NewStringValue("test"),
 				}}),
+			}}),
+		},
+		{
+			name: "test struct conversion",
+			in:   testStructType,
+			exp: NewStructValue(&messages.Struct{Data: map[string]*messages.Value{
+				"A": NewNumberValue(5),
+				"B": NewStringValue("test"),
 			}}),
 		},
 		{
