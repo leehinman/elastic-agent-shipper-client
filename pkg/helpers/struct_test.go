@@ -13,10 +13,28 @@ import (
 var result *messages.Value
 
 func BenchmarkCustomUnmarshal(b *testing.B) {
+	testStructType := struct {
+		A int
+		B string
+	}{
+		A: 5,
+		B: "test",
+	}
 	testList := mapstr.M{
 		"field1": mapstr.M{
-			"value":     3,
-			"value-str": "test",
+			"value":          3,
+			"value-str":      "test",
+			"value-list":     []interface{}{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			"value-list-str": []string{"value1", "value2", "value3", "valu4", "value5", "value6"},
+			"value-struct":   testStructType,
+			"value-bytes":    []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			"value-time":     time.Now(),
+			"value-map": map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+				"key3": "value3",
+				"key4": "value4",
+			},
 		},
 	}
 	var r *messages.Value
