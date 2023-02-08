@@ -294,10 +294,9 @@ func NewValue(v interface{}) (*messages.Value, error) {
 			}
 			mapObj := &messages.Struct{Data: reflected}
 			return NewStructValue(mapObj), nil
-		case reflect.Slice:
+		case reflect.Slice: // only for arrays that aren't type []string or []interface{}
 			refVal := reflect.ValueOf(v)
 			listVal := &messages.ListValue{Values: make([]*messages.Value, refVal.Len())}
-
 			for i := 0; i < refVal.Len(); i++ {
 				var err error
 				listVal.Values[i], err = NewValue(refVal.Index(i).Interface())
