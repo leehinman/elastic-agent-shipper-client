@@ -5,7 +5,6 @@ go 1.17
 require (
 	github.com/elastic/elastic-agent-libs v0.2.7
 	github.com/magefile/mage v1.13.0
-	github.com/mitchellh/mapstructure v1.5.0
 	github.com/stretchr/testify v1.7.0
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa
 	google.golang.org/grpc v1.42.0
