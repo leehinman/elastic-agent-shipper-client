@@ -35,12 +35,26 @@ func BenchmarkCustomUnmarshal(b *testing.B) {
 				"key3": "value3",
 				"key4": "value4",
 			},
+			"value-mapstr-nested": mapstr.M{
+				"value1": 34.5,
+				"value2": 4.5,
+				"othermap": mapstr.M{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+					"other": mapstr.M{
+						"key1": 1,
+						"key2": 455.6,
+						"key3": 987435.434,
+					},
+				},
+			},
 		},
 	}
 	var r *messages.Value
 	var err error
 	// benchmark performance for the map, which will usually be the most complex type to marshal
-	// there's a handful of different possilbe ways to handle the NewValue conversion, so it's helpful
+	// there's a handful of different possible ways to handle the NewValue conversion, so it's helpful
 	// to have a benchmark in case we decide to adjust this in the future
 	for i := 0; i < b.N; i++ {
 		r, err = NewValue(testList)
@@ -72,6 +86,36 @@ func TestStructValue(t *testing.T) {
 			exp:  &messages.Value{Kind: &messages.Value_StringValue{StringValue: "test-string"}},
 		},
 		{
+			name: "int64 conversion",
+			in:   int64(32),
+			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32)}},
+		},
+		{
+			name: "int32 conversion",
+			in:   int32(32),
+			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32)}},
+		},
+		{
+			name: "uint64 conversion",
+			in:   uint64(32),
+			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32)}},
+		},
+		{
+			name: "uint conversion",
+			in:   uint(32),
+			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32)}},
+		},
+		{
+			name: "float32 conversion",
+			in:   float32(32.5),
+			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32.5)}},
+		},
+		{
+			name: "float64 conversion",
+			in:   float64(32.5),
+			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32.5)}},
+		},
+		{
 			name: "int conversion",
 			in:   32,
 			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32)}},
@@ -84,14 +128,14 @@ func TestStructValue(t *testing.T) {
 		{
 			name: "test map conversion",
 			in: mapstr.M{
-				"field1": mapstr.M{
-					"value":     3,
+				"field1": map[string]interface{}{
+					"value":     false,
 					"value-str": "test",
 				},
 			},
 			exp: NewStructValue(&messages.Struct{Data: map[string]*messages.Value{
 				"field1": NewStructValue(&messages.Struct{Data: map[string]*messages.Value{
-					"value":     NewNumberValue(3),
+					"value":     NewBoolValue(false),
 					"value-str": NewStringValue("test"),
 				}}),
 			}}),
@@ -110,6 +154,17 @@ func TestStructValue(t *testing.T) {
 			exp: NewListValue(&messages.ListValue{Values: []*messages.Value{
 				NewStringValue("value1"),
 				NewStringValue("value2"),
+			}}),
+		},
+		{
+			name: "test list of type int",
+			in:   []uint32{45, 56, 7343, 3242, 5673},
+			exp: NewListValue(&messages.ListValue{Values: []*messages.Value{
+				NewNumberValue(45),
+				NewNumberValue(56),
+				NewNumberValue(7343),
+				NewNumberValue(3242),
+				NewNumberValue(5673),
 			}}),
 		},
 		{
