@@ -16,8 +16,7 @@
 // "google.golang.org/protobuf/encoding/protojson" package
 // ensures that they will be serialized as their JSON equivalent.
 //
-//
-// Conversion to and from a Go interface
+// # Conversion to and from a Go interface
 //
 // The standard Go "encoding/json" package has functionality to serialize
 // arbitrary types to a large degree. The Value.AsInterface, Struct.AsMap, and
@@ -30,8 +29,7 @@
 // forms back as Value, Struct, and ListValue messages, use the NewStruct,
 // NewList, and NewValue constructor functions.
 //
-//
-// Example usage
+// # Example usage
 //
 // Consider the following example JSON object:
 //
@@ -90,15 +88,16 @@
 //		... // handle error
 //	}
 //	... // make use of m as a *structpb.Value
-//
 package helpers
 
 import (
-	base64 "encoding/base64"
+	"encoding/base64"
 	"math"
+	"reflect"
 	"time"
 	utf8 "unicode/utf8"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -207,52 +206,117 @@ func AsSlice(x *messages.ListValue) []interface{} {
 //
 // When converting an int64 or uint64 to a NumberValue, numeric precision loss
 // is possible since they are stored as a float64.
-func NewValue(v interface{}) (*messages.Value, error) {
-	switch v := v.(type) {
-	case nil:
+func NewValue(newValue interface{}) (*messages.Value, error) {
+
+	if newValue == nil {
 		return NewNullValue(), nil
+	}
+
+	switch newValueTyped := newValue.(type) {
 	case bool:
-		return NewBoolValue(v), nil
+		return NewBoolValue(newValueTyped), nil
 	case int:
-		return NewNumberValue(float64(v)), nil
+		return NewNumberValue(float64(newValueTyped)), nil
 	case int32:
-		return NewNumberValue(float64(v)), nil
+		return NewNumberValue(float64(newValueTyped)), nil
 	case int64:
-		return NewNumberValue(float64(v)), nil
+		return NewNumberValue(float64(newValueTyped)), nil
 	case uint:
-		return NewNumberValue(float64(v)), nil
+		return NewNumberValue(float64(newValueTyped)), nil
 	case uint32:
-		return NewNumberValue(float64(v)), nil
+		return NewNumberValue(float64(newValueTyped)), nil
 	case uint64:
-		return NewNumberValue(float64(v)), nil
+		return NewNumberValue(float64(newValueTyped)), nil
 	case float32:
-		return NewNumberValue(float64(v)), nil
+		return NewNumberValue(float64(newValueTyped)), nil
 	case float64:
-		return NewNumberValue(float64(v)), nil
+		return NewNumberValue(newValueTyped), nil
 	case string:
-		if !utf8.ValidString(v) {
-			return nil, protoimpl.X.NewError("invalid UTF-8 in string: %q", v)
+		if !utf8.ValidString(newValueTyped) {
+			return nil, protoimpl.X.NewError("invalid UTF-8 in string: %q", newValueTyped)
 		}
-		return NewStringValue(v), nil
+		return NewStringValue(newValueTyped), nil
 	case time.Time:
-		return NewTimestampValue(v), nil
-	case []byte:
-		s := base64.StdEncoding.EncodeToString(v)
-		return NewStringValue(s), nil
+		return NewTimestampValue(newValueTyped), nil
+
 	case map[string]interface{}:
-		v2, err := NewStruct(v)
+		sv, err := NewStruct(newValueTyped)
 		if err != nil {
-			return nil, err
+			return nil, protoimpl.X.NewError("error creating struct object: %q", newValueTyped)
 		}
-		return NewStructValue(v2), nil
+		return NewStructValue(sv), nil
+	case mapstr.M: // mapstr.M is just a map[string]interface, but the typecast won't recognize that
+		sv, err := NewStruct(newValueTyped)
+		if err != nil {
+			return nil, protoimpl.X.NewError("error creating struct object: %q", newValueTyped)
+		}
+		return NewStructValue(sv), nil
 	case []interface{}:
-		v2, err := NewList(v)
+		lst, err := NewList(newValueTyped)
 		if err != nil {
-			return nil, err
+			return nil, protoimpl.X.NewError("error creating list object: %q", newValueTyped)
 		}
-		return NewListValue(v2), nil
-	default:
-		return nil, protoimpl.X.NewError("invalid type: %T", v)
+		return NewListValue(lst), nil
+	case []string: // not strictly needed, but []string seems to be common in log events, so this will give a slight performance boost
+		strListVal := &messages.ListValue{Values: make([]*messages.Value, len(newValueTyped))}
+		for i, sv := range newValueTyped {
+			strListVal.Values[i] = NewStringValue(sv)
+		}
+		return NewListValue(strListVal), nil
+	case []byte:
+		s := base64.StdEncoding.EncodeToString(newValueTyped)
+		return NewStringValue(s), nil
+
+	default: // fall back to using reflection to unpack the value
+		switch reflect.TypeOf(newValueTyped).Kind() {
+		case reflect.Struct:
+			mapVal := reflect.ValueOf(newValueTyped)
+			fields := reflect.TypeOf(newValueTyped)
+			interMap := map[string]*messages.Value{}
+			for i := 0; i < mapVal.NumField(); i++ {
+				msgVal, err := NewValue(mapVal.Field(i).Interface())
+				if err != nil {
+					return nil, protoimpl.X.NewError("could not convert value of type %T in struct: %s", newValueTyped, err)
+				}
+				name := fields.Field(i).Name // is there a struct tag we should use instead?
+				interMap[name] = msgVal
+			}
+			structObj := &messages.Struct{Data: interMap}
+			return NewStructValue(structObj), nil
+		case reflect.Map: // we'll only end up here if we have a map that doesn't resolve to value type interface{}
+			reflected := map[string]*messages.Value{}
+			mapIter := reflect.ValueOf(newValueTyped).MapRange()
+			// hard error if the key type isn't a string
+			if reftype := reflect.TypeOf(newValueTyped).Key().Kind(); reftype != reflect.String {
+				return nil, protoimpl.X.NewError("maps must have key of type string, got %v", reftype)
+			}
+			var err error
+			for mapIter.Next() {
+				k := mapIter.Key().String()
+				mv := mapIter.Value().Interface()
+				reflected[k], err = NewValue(mv)
+				if err != nil {
+					protoimpl.X.NewError("could not convert value of type %T in map: %s", mv, err)
+				}
+			}
+			mapObj := &messages.Struct{Data: reflected}
+			return NewStructValue(mapObj), nil
+		case reflect.Slice: // only for arrays that aren't type []string or []interface{}
+			refVal := reflect.ValueOf(newValueTyped)
+			listVal := &messages.ListValue{Values: make([]*messages.Value, refVal.Len())}
+			for i := 0; i < refVal.Len(); i++ {
+				var err error
+				listVal.Values[i], err = NewValue(refVal.Index(i).Interface())
+				if err != nil {
+					return nil, protoimpl.X.NewError("error unpacking field of type %T in array %#v: %s", refVal.Field(i).Interface(), newValueTyped, err)
+				}
+			}
+
+			return NewListValue(listVal), nil
+		default:
+			return nil, protoimpl.X.NewError("invalid type: %T", newValueTyped)
+		}
+
 	}
 }
 
