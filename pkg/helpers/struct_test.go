@@ -2,13 +2,108 @@ package helpers
 
 import (
 	"encoding/base64"
-	"testing"
+	"encoding/json"
 	"time"
+
+	"testing"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/stretchr/testify/require"
 )
+
+var marshalResult = []byte{}
+
+func BenchmarkCustomMarshal(b *testing.B) {
+	testMapInput := mapstr.M{
+		"StrTest":  "teststr",
+		"Uint1":    32,
+		"Uint2":    556,
+		"Float1":   23.0,
+		"Float2":   25.343564,
+		"TestNil":  nil,
+		"TestBool": false,
+		"TestList": []interface{}{"strval", 5, false},
+		"TestMap":  map[string]string{"testkey": "val"},
+		"TestMapStr": mapstr.M{"key1": 5, "key2": "strval", "keymap": mapstr.M{
+			"key1": "value1",
+			"key2": "value2",
+			"key3": "value3",
+		}},
+	}
+
+	testMessage, err := NewValue(testMapInput)
+	if err != nil {
+		b.Logf("error creating value from struct: %s", err)
+		b.FailNow()
+	}
+	b.ResetTimer()
+	b.Run("marshal custom protobuf message.Value type", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			jsonEventData, err := json.Marshal(testMessage)
+			if err != nil {
+				b.Logf("error marshaling data: %s", err)
+				b.FailNow()
+			}
+			marshalResult = jsonEventData
+		}
+	})
+	b.Run("standard struct using stdlib", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			jsonEventData, err := json.Marshal(testMapInput)
+			if err != nil {
+				b.Logf("error marshaling data: %s", err)
+				b.FailNow()
+			}
+			marshalResult = jsonEventData
+		}
+	})
+}
+
+func TestJSONMarshal(t *testing.T) {
+	testMapInput := mapstr.M{
+		"StrTest":       "test",
+		"StrTestEscape": `"test_with_quotes"`,
+		"Uint1":         32,
+		"Uint2":         556,
+		"Float1":        23.0,
+		"Float2":        25.343564,
+		"TestNil":       nil,
+		"TestBool":      false,
+		"TestList":      []interface{}{"strval", 5, false},
+		"TestMap":       map[string]string{"testkey": "val"},
+		"TestMapStr": mapstr.M{"key1": 5, "key2": "strval", "keymap": mapstr.M{
+			"key1": "value1",
+			"key2": "value2",
+			"key3": "value3",
+		}},
+	}
+
+	testMessage, err := NewValue(testMapInput)
+	require.NoError(t, err)
+
+	jsonEventData, err := json.Marshal(testMessage)
+	require.NoError(t, err)
+	t.Logf("got     : %s", string(jsonEventData))
+
+	stdJSON, err := json.Marshal(testMapInput)
+	require.NoError(t, err)
+	t.Logf("expected: %s", string(stdJSON))
+
+	// JSON string outputs aren't guarenteed to be determinative, so unmarshal back to map so we can compare
+	unmarshaledEvent := mapstr.M{}
+	err = json.Unmarshal(jsonEventData, &unmarshaledEvent)
+	require.NoError(t, err)
+	t.Logf("got     : %s", unmarshaledEvent.StringToPrint())
+
+	unmarshaledJSON := mapstr.M{}
+	err = json.Unmarshal(stdJSON, &unmarshaledJSON)
+	require.NoError(t, err)
+	t.Logf("expected: %s", unmarshaledJSON.StringToPrint())
+
+	require.Equal(t, unmarshaledJSON, unmarshaledEvent)
+
+}
 
 var result *messages.Value
 
