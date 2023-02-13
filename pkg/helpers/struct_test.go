@@ -84,11 +84,9 @@ func TestJSONMarshal(t *testing.T) {
 
 	jsonEventData, err := json.Marshal(testMessage)
 	require.NoError(t, err)
-	t.Logf("got     : %s", string(jsonEventData))
 
 	stdJSON, err := json.Marshal(testMapInput)
 	require.NoError(t, err)
-	t.Logf("expected: %s", string(stdJSON))
 
 	// JSON string outputs aren't guarenteed to be determinative, so unmarshal back to map so we can compare
 	unmarshaledEvent := mapstr.M{}
