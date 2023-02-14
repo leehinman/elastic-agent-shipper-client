@@ -5,62 +5,83 @@
 package messages
 
 import (
-	"encoding/json"
 	"fmt"
+	"time"
+
+	"go.elastic.co/fastjson"
 )
 
-// MarshalJSON implements the JSON interface for the value type
-func (val *Value) MarshalJSON() ([]byte, error) {
+// MarshalFastJSON implements the JSON interface for the value type
+func (val *Value) MarshalFastJSON(w *fastjson.Writer) error {
 	switch typ := val.GetKind().(type) {
 	case *Value_NullValue:
-		return []byte("null"), nil
+		w.RawString("null")
+		return nil
 	case *Value_NumberValue:
-		return json.Marshal(typ.NumberValue)
+		w.Float64(typ.NumberValue)
+		return nil
 	case *Value_StringValue:
-		return json.Marshal(typ.StringValue)
+		w.String(typ.StringValue)
+		return nil
 	case *Value_BoolValue:
-		if typ.BoolValue {
-			return []byte("true"), nil
-		}
-		return []byte("false"), nil
+		w.Bool(typ.BoolValue)
+		return nil
 	case *Value_StructValue:
-		data, err := typ.StructValue.MarshalJSON()
+		err := typ.StructValue.MarshalFastJSON(w)
 		if err != nil {
-			return nil, fmt.Errorf("error marshaling within value: %w", err)
+			return fmt.Errorf("error marshaling within value: %w", err)
 		}
-		return data, nil
+		// return data, nil
 	case *Value_ListValue:
-		data, err := typ.ListValue.MarshalJSON()
+		err := typ.ListValue.MarshalFastJSON(w)
 		if err != nil {
-			return nil, fmt.Errorf("error marshaling within value: %w", err)
+			return fmt.Errorf("error marshaling within value: %w", err)
 		}
-		return data, nil
+		return nil
 	case *Value_TimestampValue:
-		data, err := typ.TimestampValue.AsTime().MarshalJSON()
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling timestamp within value: %w", err)
-		}
-		return data, nil
+		w.Time(typ.TimestampValue.AsTime(), time.RFC3339)
 	default:
-		return nil, fmt.Errorf("Unknown type %T in event", typ)
+		return fmt.Errorf("Unknown type %T in event", typ)
 	}
+	return nil
 }
 
-// MarshalJSON implements the JSON interface for the struct type
-func (sv *Struct) MarshalJSON() ([]byte, error) {
-	data, err := json.Marshal(sv.GetData())
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling struct type: %w", err)
+// MarshalFastJSON implements the JSON interface for the struct type
+func (sv *Struct) MarshalFastJSON(w *fastjson.Writer) error {
+	if sv.GetData() == nil {
+		return nil
 	}
-	return data, nil
+	w.RawByte('{')
+	beginning := true
+	for key, val := range sv.GetData() {
+		if !beginning {
+			w.RawByte(',')
+		} else {
+			beginning = false
+		}
+
+		w.RawString(fmt.Sprintf("\"%s\":", key))
+		err := val.MarshalFastJSON(w)
+		if err != nil {
+			return fmt.Errorf("error marshaling value in map: %w", err)
+		}
+	}
+	w.RawByte('}')
+	return nil
 }
 
-// MarshalJSON implements the JSON interface for the list Value type
-func (lv *ListValue) MarshalJSON() ([]byte, error) {
-	data, err := json.Marshal(lv.GetValues())
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling list type: %w", err)
+// MarshalFastJSON implements the JSON interface for the list Value type
+func (lv *ListValue) MarshalFastJSON(w *fastjson.Writer) error {
+	if lv.GetValues() == nil {
+		return nil
 	}
-	return data, nil
-
+	w.RawByte('[')
+	for iter, val := range lv.GetValues() {
+		if iter > 0 {
+			w.RawByte(',')
+		}
+		val.MarshalFastJSON(w)
+	}
+	w.RawByte(']')
+	return nil
 }

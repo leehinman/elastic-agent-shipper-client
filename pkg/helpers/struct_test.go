@@ -3,6 +3,7 @@ package helpers
 import (
 	"encoding/base64"
 	"encoding/json"
+	"reflect"
 	"time"
 
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/stretchr/testify/require"
+	"go.elastic.co/fastjson"
 )
 
 var marshalResult = []byte{}
@@ -64,14 +66,25 @@ func TestJSONMarshal(t *testing.T) {
 	testMapInput := mapstr.M{
 		"StrTest":       "test",
 		"StrTestEscape": `"test_with_quotes"`,
-		"Uint1":         32,
-		"Uint2":         556,
-		"Float1":        23.0,
+		"Uint1":         uint32(32),
+		"Uint2":         uint64(556),
+		"Float1":        float32(23.0),
 		"Float2":        25.343564,
 		"TestNil":       nil,
 		"TestBool":      false,
 		"TestList":      []interface{}{"strval", 5, false},
 		"TestMap":       map[string]string{"testkey": "val"},
+		"testMapNested": map[string]interface{}{
+			"testlevel1": map[string]interface{}{
+				"testLevel2": map[string]interface{}{
+					"testlevel3": map[string]int{
+						"val":       4,
+						"otherval":  10,
+						"otherval2": 3425543,
+					},
+				},
+			},
+		},
 		"TestMapStr": mapstr.M{"key1": 5, "key2": "strval", "keymap": mapstr.M{
 			"key1": "value1",
 			"key2": "value2",
@@ -82,15 +95,18 @@ func TestJSONMarshal(t *testing.T) {
 	testMessage, err := NewValue(testMapInput)
 	require.NoError(t, err)
 
-	jsonEventData, err := json.Marshal(testMessage)
+	jsonWriter := &fastjson.Writer{}
+	err = fastjson.Marshal(jsonWriter, testMessage)
+	t.Logf("GOT: %s", string(jsonWriter.Bytes()))
 	require.NoError(t, err)
 
 	stdJSON, err := json.Marshal(testMapInput)
 	require.NoError(t, err)
+	t.Logf("EXPECTED: %s", string(stdJSON))
 
-	// JSON string outputs aren't guarenteed to be determinative, so unmarshal back to map so we can compare
+	// JSON string outputs aren't guarenteed to be determinative, so unmarshal back to map so we can compare, test for JSON errors
 	unmarshaledEvent := mapstr.M{}
-	err = json.Unmarshal(jsonEventData, &unmarshaledEvent)
+	err = json.Unmarshal(jsonWriter.Bytes(), &unmarshaledEvent)
 	require.NoError(t, err)
 	t.Logf("got     : %s", unmarshaledEvent.StringToPrint())
 
@@ -99,8 +115,9 @@ func TestJSONMarshal(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("expected: %s", unmarshaledJSON.StringToPrint())
 
-	require.Equal(t, unmarshaledJSON, unmarshaledEvent)
-
+	if !reflect.DeepEqual(unmarshaledJSON, unmarshaledEvent) {
+		t.Fatalf("events are different")
+	}
 }
 
 var result *messages.Value
