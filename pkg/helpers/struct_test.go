@@ -104,7 +104,7 @@ func TestJSONMarshal(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("EXPECTED: %s", string(stdJSON))
 
-	// JSON string outputs aren't guarenteed to be determinative, so unmarshal back to map so we can compare, test for JSON errors
+	// JSON string outputs aren't guaranteed to be deterministic, so unmarshal back to map so we can compare, test for JSON errors
 	unmarshaledEvent := mapstr.M{}
 	err = json.Unmarshal(jsonWriter.Bytes(), &unmarshaledEvent)
 	require.NoError(t, err)
