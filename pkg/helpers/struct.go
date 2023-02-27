@@ -92,7 +92,6 @@ package helpers
 
 import (
 	"encoding/base64"
-	"math"
 	"reflect"
 	"time"
 	utf8 "unicode/utf8"
@@ -140,18 +139,29 @@ func AsMap(x *messages.Struct) map[string]interface{} {
 // converted as strings to remain compatible with MarshalJSON.
 func AsInterface(x *messages.Value) interface{} {
 	switch v := x.GetKind().(type) {
-	case *messages.Value_NumberValue:
+	case *messages.Value_Float64Value:
 		if v != nil {
-			switch {
-			case math.IsNaN(v.NumberValue):
-				return "NaN"
-			case math.IsInf(v.NumberValue, +1):
-				return "Infinity"
-			case math.IsInf(v.NumberValue, -1):
-				return "-Infinity"
-			default:
-				return v.NumberValue
-			}
+			return v.Float64Value
+		}
+	case *messages.Value_Float32Value:
+		if v != nil {
+			return v.Float32Value
+		}
+	case *messages.Value_Int32Value:
+		if v != nil {
+			return v.Int32Value
+		}
+	case *messages.Value_Int64Value:
+		if v != nil {
+			return v.Int64Value
+		}
+	case *messages.Value_Uint32Value:
+		if v != nil {
+			return v.Uint32Value
+		}
+	case *messages.Value_Uint64Value:
+		if v != nil {
+			return v.Uint64Value
 		}
 	case *messages.Value_StringValue:
 		if v != nil {
@@ -188,22 +198,6 @@ func AsSlice(x *messages.ListValue) []interface{} {
 }
 
 // NewValue constructs a Value from a general-purpose Go interface.
-//
-//	╔════════════════════════╤════════════════════════════════════════════╗
-//	║ Go type                │ Conversion                                 ║
-//	╠════════════════════════╪════════════════════════════════════════════╣
-//	║ nil                    │ stored as NullValue                        ║
-//	║ bool                   │ stored as BoolValue                        ║
-//	║ int, int32, int64      │ stored as NumberValue                      ║
-//	║ uint, uint32, uint64   │ stored as NumberValue                      ║
-//	║ float32, float64       │ stored as NumberValue                      ║
-//	║ string                 │ stored as StringValue; must be valid UTF-8 ║
-//	║ time.Time              │ stored as TimestampValue;                  ║
-//	║ []byte                 │ stored as StringValue; base64-encoded      ║
-//	║ map[string]interface{} │ stored as StructValue                      ║
-//	║ []interface{}          │ stored as ListValue                        ║
-//	╚════════════════════════╧════════════════════════════════════════════╝
-//
 // When converting an int64 or uint64 to a NumberValue, numeric precision loss
 // is possible since they are stored as a float64.
 func NewValue(newValue interface{}) (*messages.Value, error) {
@@ -216,21 +210,21 @@ func NewValue(newValue interface{}) (*messages.Value, error) {
 	case bool:
 		return NewBoolValue(newValueTyped), nil
 	case int:
-		return NewNumberValue(float64(newValueTyped)), nil
+		return NewInt64Value(int64(newValueTyped)), nil
 	case int32:
-		return NewNumberValue(float64(newValueTyped)), nil
+		return NewInt32Value(newValueTyped), nil
 	case int64:
-		return NewNumberValue(float64(newValueTyped)), nil
+		return NewInt64Value(newValueTyped), nil
 	case uint:
-		return NewNumberValue(float64(newValueTyped)), nil
+		return NewUint64Value(uint64(newValueTyped)), nil
 	case uint32:
-		return NewNumberValue(float64(newValueTyped)), nil
+		return NewUint32Value(newValueTyped), nil
 	case uint64:
-		return NewNumberValue(float64(newValueTyped)), nil
+		return NewUint64Value(newValueTyped), nil
 	case float32:
-		return NewNumberValue(float64(newValueTyped)), nil
+		return NewFloat32Value(newValueTyped), nil
 	case float64:
-		return NewNumberValue(newValueTyped), nil
+		return NewFloat64Value(newValueTyped), nil
 	case string:
 		if !utf8.ValidString(newValueTyped) {
 			return nil, protoimpl.X.NewError("invalid UTF-8 in string: %q", newValueTyped)
@@ -330,9 +324,34 @@ func NewBoolValue(v bool) *messages.Value {
 	return &messages.Value{Kind: &messages.Value_BoolValue{BoolValue: v}}
 }
 
-// NewNumberValue constructs a new number Value.
-func NewNumberValue(v float64) *messages.Value {
-	return &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: v}}
+// NewFloat32Value constructs a new float32 value
+func NewFloat32Value(v float32) *messages.Value {
+	return &messages.Value{Kind: &messages.Value_Float32Value{Float32Value: v}}
+}
+
+// NewFloat64Value constructs a new float64 value
+func NewFloat64Value(v float64) *messages.Value {
+	return &messages.Value{Kind: &messages.Value_Float64Value{Float64Value: v}}
+}
+
+// NewInt32Value constructs a new int32 value
+func NewInt32Value(v int32) *messages.Value {
+	return &messages.Value{Kind: &messages.Value_Int32Value{Int32Value: v}}
+}
+
+// NewInt64Value constructs a new int64 value
+func NewInt64Value(v int64) *messages.Value {
+	return &messages.Value{Kind: &messages.Value_Int64Value{Int64Value: v}}
+}
+
+// NewUint32Value constructs a new uint632 value
+func NewUint32Value(v uint32) *messages.Value {
+	return &messages.Value{Kind: &messages.Value_Uint32Value{Uint32Value: v}}
+}
+
+// NewUint64Value constructs a new uint64 value
+func NewUint64Value(v uint64) *messages.Value {
+	return &messages.Value{Kind: &messages.Value_Uint64Value{Uint64Value: v}}
 }
 
 // NewStringValue constructs a new string Value.
