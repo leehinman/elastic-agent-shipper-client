@@ -35,7 +35,6 @@ type ProducerClient interface {
 	// The client is expected to retry sending the rest of the events in a separate request.
 	//
 	// The client is also expected to have some kind of backoff strategy
-	//
 	//	in case of a reply with an accepted count < the amount of sent events.
 	PublishEvents(ctx context.Context, in *messages.PublishRequest, opts ...grpc.CallOption) (*messages.PublishReply, error)
 	// Returns the shipper's uuid and its current position in the event stream (persisted index).
@@ -103,7 +102,6 @@ type ProducerServer interface {
 	// The client is expected to retry sending the rest of the events in a separate request.
 	//
 	// The client is also expected to have some kind of backoff strategy
-	//
 	//	in case of a reply with an accepted count < the amount of sent events.
 	PublishEvents(context.Context, *messages.PublishRequest) (*messages.PublishReply, error)
 	// Returns the shipper's uuid and its current position in the event stream (persisted index).
