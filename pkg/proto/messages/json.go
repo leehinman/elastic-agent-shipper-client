@@ -39,7 +39,9 @@ func (val *Value) MarshalFastJSON(w *fastjson.Writer) error {
 		}
 		return nil
 	case *Value_TimestampValue:
-		w.Time(typ.TimestampValue.AsTime(), time.RFC3339)
+		w.RawByte('"')
+		w.Time(typ.TimestampValue.AsTime(), time.RFC3339Nano)
+		w.RawByte('"')
 	default:
 		return fmt.Errorf("Unknown type %T in event", typ)
 	}
