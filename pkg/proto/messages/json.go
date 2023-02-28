@@ -17,8 +17,22 @@ func (val *Value) MarshalFastJSON(w *fastjson.Writer) error {
 	case *Value_NullValue:
 		w.RawString("null")
 		return nil
-	case *Value_NumberValue:
-		w.Float64(typ.NumberValue)
+	case *Value_Float32Value:
+		w.Float32(typ.Float32Value)
+	case *Value_Float64Value:
+		w.Float64(typ.Float64Value)
+		return nil
+	case *Value_Int32Value:
+		w.Int64(int64(typ.Int32Value))
+		return nil
+	case *Value_Int64Value:
+		w.Int64(typ.Int64Value)
+		return nil
+	case *Value_Uint32Value:
+		w.Uint64(uint64(typ.Uint32Value))
+		return nil
+	case *Value_Uint64Value:
+		w.Uint64(typ.Uint64Value)
 		return nil
 	case *Value_StringValue:
 		w.String(typ.StringValue)

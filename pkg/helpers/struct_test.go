@@ -62,6 +62,50 @@ func BenchmarkCustomMarshal(b *testing.B) {
 	})
 }
 
+func TestAsInterface(t *testing.T) {
+	cases := []struct {
+		name string
+		in   *messages.Value
+		exp  interface{}
+	}{
+		{
+			name: "test map conversion",
+			in: NewStructValue(&messages.Struct{Data: map[string]*messages.Value{
+				"field1": NewStructValue(&messages.Struct{Data: map[string]*messages.Value{
+					"value":     NewBoolValue(false),
+					"value-str": NewStringValue("test"),
+				}}),
+			}}),
+			exp: map[string]interface{}{
+				"field1": map[string]interface{}{
+					"value":     false,
+					"value-str": "test",
+				},
+			},
+		},
+		{
+			name: "test list",
+			in: NewListValue(&messages.ListValue{Values: []*messages.Value{
+				NewFloat32Value(45.3),
+				NewStringValue("testStr"),
+				NewInt64Value(4590),
+			}}),
+			exp: []interface{}{
+				float32(45.3),
+				"testStr",
+				int64(4590),
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			res := AsInterface(c.in)
+			require.Equal(t, c.exp, res)
+		})
+	}
+}
+
 func TestJSONMarshal(t *testing.T) {
 	testMapInput := mapstr.M{
 		"StrTest":       "test",
@@ -198,37 +242,37 @@ func TestStructValue(t *testing.T) {
 		{
 			name: "int64 conversion",
 			in:   int64(32),
-			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32)}},
+			exp:  &messages.Value{Kind: &messages.Value_Int64Value{Int64Value: 32}},
 		},
 		{
 			name: "int32 conversion",
 			in:   int32(32),
-			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32)}},
+			exp:  &messages.Value{Kind: &messages.Value_Int32Value{Int32Value: 32}},
 		},
 		{
 			name: "uint64 conversion",
 			in:   uint64(32),
-			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32)}},
+			exp:  &messages.Value{Kind: &messages.Value_Uint64Value{Uint64Value: 32}},
 		},
 		{
 			name: "uint conversion",
 			in:   uint(32),
-			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32)}},
+			exp:  &messages.Value{Kind: &messages.Value_Uint64Value{Uint64Value: 32}},
 		},
 		{
 			name: "float32 conversion",
 			in:   float32(32.5),
-			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32.5)}},
+			exp:  &messages.Value{Kind: &messages.Value_Float32Value{Float32Value: 32.5}},
 		},
 		{
 			name: "float64 conversion",
 			in:   float64(32.5),
-			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32.5)}},
+			exp:  &messages.Value{Kind: &messages.Value_Float64Value{Float64Value: 32.5}},
 		},
 		{
 			name: "int conversion",
 			in:   32,
-			exp:  &messages.Value{Kind: &messages.Value_NumberValue{NumberValue: float64(32)}},
+			exp:  &messages.Value{Kind: &messages.Value_Int64Value{Int64Value: 32}},
 		},
 		{
 			name: "nil value",
@@ -254,7 +298,7 @@ func TestStructValue(t *testing.T) {
 			name: "test struct conversion",
 			in:   testStructType,
 			exp: NewStructValue(&messages.Struct{Data: map[string]*messages.Value{
-				"A": NewNumberValue(5),
+				"A": NewInt64Value(5),
 				"B": NewStringValue("test"),
 			}}),
 		},
@@ -270,11 +314,11 @@ func TestStructValue(t *testing.T) {
 			name: "test list of type int",
 			in:   []uint32{45, 56, 7343, 3242, 5673},
 			exp: NewListValue(&messages.ListValue{Values: []*messages.Value{
-				NewNumberValue(45),
-				NewNumberValue(56),
-				NewNumberValue(7343),
-				NewNumberValue(3242),
-				NewNumberValue(5673),
+				NewUint32Value(45),
+				NewUint32Value(56),
+				NewUint32Value(7343),
+				NewUint32Value(3242),
+				NewUint32Value(5673),
 			}}),
 		},
 		{
@@ -282,7 +326,7 @@ func TestStructValue(t *testing.T) {
 			in:   []interface{}{"value1", 3},
 			exp: NewListValue(&messages.ListValue{Values: []*messages.Value{
 				NewStringValue("value1"),
-				NewNumberValue(3),
+				NewInt64Value(3),
 			}}),
 		},
 		{

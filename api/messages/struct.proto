@@ -59,18 +59,28 @@ message Value {
   oneof kind {
     // Represents a null value.
     NullValue null_value = 1;
-    // Represents a double value.
-    double number_value = 2;
+    // Represents a float64 value.
+    double float64_value = 2;
+    // Represents a float32 value
+    float float32_value = 3;
+    // Represents an int32 value
+    int32 int32_value = 4;
+    // Represents an int64 value
+    int64 int64_value = 5;
+    // Represents a uint32 value
+    uint32 uint32_value = 6;
+    // Represents a uint64 value
+    uint64 uint64_value = 7;
     // Represents a string value.
-    string string_value = 3;
+    string string_value = 8;
     // Represents a boolean value.
-    bool bool_value = 4;
+    bool bool_value = 9;
     // Represents a structured value.
-    Struct struct_value = 5;
+    Struct struct_value = 10;
     // Represents a repeated `Value`.
-    ListValue list_value = 6;
+    ListValue list_value = 11;
     // Represents a timestamp.
-    google.protobuf.Timestamp timestamp_value = 7;
+    google.protobuf.Timestamp timestamp_value = 12;
   }
 }
 

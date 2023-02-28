@@ -54,7 +54,7 @@ var (
 
 // Update updates all the generated code out of the spec
 func Update() {
-	mg.SerialDeps(GenereateGo, License)
+	mg.SerialDeps(GenerateGo, License)
 }
 
 // InstallProtoGo installs required plugins for protoc
@@ -76,8 +76,8 @@ func InstallLicenser() error {
 	return gotool.Install(gotool.Install.Package(goLicenserRepo))
 }
 
-// GenerateProto regenerates the Go files out of .proto files
-func GenereateGo() error {
+// GenerateGo regenerates the Go files out of .proto files
+func GenerateGo() error {
 	mg.Deps(InstallProtoGo)
 
 	var (
