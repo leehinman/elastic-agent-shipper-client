@@ -107,7 +107,9 @@ func TestAsInterface(t *testing.T) {
 }
 
 func TestJSONMarshal(t *testing.T) {
+	ts := time.Now().UTC() // the timestamppb used by protobuf will remove the location, so set UTC to make DeepEqual happy
 	testMapInput := mapstr.M{
+		"@timestamp":    ts,
 		"StrTest":       "test",
 		"StrTestEscape": `"test_with_quotes"`,
 		"Uint1":         uint32(32),
@@ -283,14 +285,14 @@ func TestStructValue(t *testing.T) {
 			name: "test map conversion",
 			in: mapstr.M{
 				"field1": map[string]interface{}{
-					"value":     false,
-					"value-str": "test",
+					"value":      false,
+					"@timestamp": ts,
 				},
 			},
 			exp: NewStructValue(&messages.Struct{Data: map[string]*messages.Value{
 				"field1": NewStructValue(&messages.Struct{Data: map[string]*messages.Value{
-					"value":     NewBoolValue(false),
-					"value-str": NewStringValue("test"),
+					"value":      NewBoolValue(false),
+					"@timestamp": NewTimestampValue(ts),
 				}}),
 			}}),
 		},
