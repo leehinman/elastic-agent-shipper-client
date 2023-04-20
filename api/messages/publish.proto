@@ -36,10 +36,24 @@ message Event {
  Source source = 2;
  // Data stream for the event.
  DataStream data_stream = 3;
- // Metadata JSON object (map[string]google.protobuf.Value)
+ // Metadata JSON object (json string)
  messages.Struct metadata = 4;
- // Field JSON object (map[string]google.protobuf.Value)
+ // Field JSON object (json string)
  messages.Struct fields = 5;
+}
+
+// Event is a translation of beat.Event into protobuf.
+message ShallowEvent {
+ // Creation timestamp of the event.
+ google.protobuf.Timestamp timestamp = 1;
+ // Source of the generated event.
+ Source source = 2;
+ // Data stream for the event.
+ DataStream data_stream = 3;
+ // Metadata JSON object (json string)
+ bytes metadata = 4;
+ // Field JSON object (json string)
+ bytes fields = 5;
 }
 
 // Source information required for proper event tracking, processing and routing
