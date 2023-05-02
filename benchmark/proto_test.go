@@ -21,9 +21,17 @@ import (
 	"github.com/elastic/go-structform/gotype"
 	fxamacker "github.com/fxamacker/cbor/v2"
 	goccy "github.com/goccy/go-json"
+
+	"github.com/planetscale/vtprotobuf/codec/grpc"
+	"google.golang.org/grpc/encoding"
+	_ "google.golang.org/grpc/encoding/proto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+func init() {
+	encoding.RegisterCodec(grpc.Codec{})
+}
 
 type ShallowEvent struct {
 	Timestamp  string     `json:"timestamp"`
@@ -136,6 +144,18 @@ func rtMessagesEvent(m *messages.Event) {
 	}
 }
 
+func rtVTMessagesEvent(m *messages.Event) {
+	b, err := m.MarshalVT()
+	if err != nil {
+		panic(err)
+	}
+	new := &messages.Event{}
+	err = new.UnmarshalVT(b)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func bytesToMapStr(input [][]byte) ([]*mapstr.M, error) {
 	events := []*mapstr.M{}
 	for _, raw := range input {
@@ -222,6 +242,18 @@ func rtMessagesShallowEvent(m *messages.ShallowEvent) {
 	}
 }
 
+func rtVTMessagesShallowEvent(m *messages.ShallowEvent) {
+	b, err := m.MarshalVT()
+	if err != nil {
+		panic(err)
+	}
+	new := &messages.ShallowEvent{}
+	err = new.UnmarshalVT(b)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func rtMessagesShallowEventFull(m *messages.ShallowEvent) {
 	b, err := proto.Marshal(m)
 	if err != nil {
@@ -252,6 +284,36 @@ func rtMessagesShallowEventFull(m *messages.ShallowEvent) {
 	}
 }
 
+func rtVTMessagesShallowEventFull(m *messages.ShallowEvent) {
+	b, err := m.MarshalVT()
+	if err != nil {
+		panic(err)
+	}
+	new := &messages.ShallowEvent{}
+	err = new.UnmarshalVT(b)
+	if err != nil {
+		panic(err)
+	}
+	fields := mapstr.M{}
+	err = json.Unmarshal([]byte(new.Fields), &fields)
+	if err != nil {
+		panic(err)
+	}
+	b, err = json.Marshal(fields)
+	if err != nil {
+		panic(err)
+	}
+	meta := mapstr.M{}
+	err = json.Unmarshal([]byte(new.Metadata), &meta)
+	if err != nil {
+		panic(err)
+	}
+	b, err = json.Marshal(meta)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func rtMessagesShallowEventFullGoJSON(m *messages.ShallowEvent) {
 	b, err := proto.Marshal(m)
 	if err != nil {
@@ -259,6 +321,36 @@ func rtMessagesShallowEventFullGoJSON(m *messages.ShallowEvent) {
 	}
 	new := messages.ShallowEvent{}
 	err = proto.Unmarshal(b, &new)
+	if err != nil {
+		panic(err)
+	}
+	fields := mapstr.M{}
+	err = goccy.Unmarshal([]byte(new.Fields), &fields)
+	if err != nil {
+		panic(err)
+	}
+	b, err = goccy.Marshal(fields)
+	if err != nil {
+		panic(err)
+	}
+	meta := mapstr.M{}
+	err = goccy.Unmarshal([]byte(new.Metadata), &meta)
+	if err != nil {
+		panic(err)
+	}
+	b, err = goccy.Marshal(meta)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func rtVTMessagesShallowEventFullGoJSON(m *messages.ShallowEvent) {
+	b, err := m.MarshalVT()
+	if err != nil {
+		panic(err)
+	}
+	new := messages.ShallowEvent{}
+	err = new.UnmarshalVT(b)
 	if err != nil {
 		panic(err)
 	}
@@ -480,6 +572,18 @@ func BenchmarkMarshalUnmarshal(b *testing.B) {
 				}
 			}
 		})
+		b.Run(bm.name+"VTProtobuf", func(b *testing.B) {
+			events, err := bytesToMessagesEvents(rawBytes)
+			if err != nil {
+				panic(err)
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				for _, e := range events {
+					rtVTMessagesEvent(e)
+				}
+			}
+		})
 		b.Run(bm.name+"MapStrStdJSON", func(b *testing.B) {
 			events, err := bytesToMapStr(rawBytes)
 			if err != nil {
@@ -504,6 +608,18 @@ func BenchmarkMarshalUnmarshal(b *testing.B) {
 				}
 			}
 		})
+		b.Run(bm.name+"VTShallowProtobuf", func(b *testing.B) {
+			events, err := bytesToMessagesShallowEvents(rawBytes)
+			if err != nil {
+				panic(err)
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				for _, e := range events {
+					rtVTMessagesShallowEvent(e)
+				}
+			}
+		})
 		b.Run(bm.name+"ShallowProtobufFull", func(b *testing.B) {
 			events, err := bytesToMessagesShallowEvents(rawBytes)
 			if err != nil {
@@ -516,6 +632,18 @@ func BenchmarkMarshalUnmarshal(b *testing.B) {
 				}
 			}
 		})
+		b.Run(bm.name+"VTShallowProtobufFull", func(b *testing.B) {
+			events, err := bytesToMessagesShallowEvents(rawBytes)
+			if err != nil {
+				panic(err)
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				for _, e := range events {
+					rtVTMessagesShallowEventFull(e)
+				}
+			}
+		})
 		b.Run(bm.name+"ShallowProtobufFullGoJSON", func(b *testing.B) {
 			events, err := bytesToMessagesShallowEvents(rawBytes)
 			if err != nil {
@@ -525,6 +653,18 @@ func BenchmarkMarshalUnmarshal(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				for _, e := range events {
 					rtMessagesShallowEventFullGoJSON(e)
+				}
+			}
+		})
+		b.Run(bm.name+"ShallowVTProtobufFullGoJSON", func(b *testing.B) {
+			events, err := bytesToMessagesShallowEvents(rawBytes)
+			if err != nil {
+				panic(err)
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				for _, e := range events {
+					rtVTMessagesShallowEventFullGoJSON(e)
 				}
 			}
 		})

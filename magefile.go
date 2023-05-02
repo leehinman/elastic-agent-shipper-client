@@ -107,9 +107,14 @@ func GenerateGo() error {
 	args := append(
 		[]string{
 			"--go_out=" + protoDest,
+			"--plugin=protoc-gen-go=/Users/hinman/go/bin/protoc-gen-go",
 			"--go-grpc_out=" + protoDest,
+			"--plugin=protoc-gen-go-grpc=/Users/hinman/go/bin/protoc-gen-go-grpc",
 			"--go_opt=paths=source_relative",
 			"--go-grpc_opt=paths=source_relative",
+			"--go-vtproto_opt=paths=source_relative",
+			"--go-vtproto_out=" + protoDest,
+			"--plugin=protoc-gen-go-vtproto=/Users/hinman/go/bin/protoc-gen-go-vtproto",
 		},
 		importFlags...,
 	)
