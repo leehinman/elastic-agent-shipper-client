@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/beats/v7/libbeat/beat"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/helpers"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
@@ -132,6 +133,50 @@ func bytesToMessagesEvents(input [][]byte) ([]*messages.Event, error) {
 	return events, nil
 }
 
+func bytesToBeatEvents(input [][]byte) ([]*beat.Event, error) {
+	events := []*beat.Event{}
+	for _, raw := range input {
+		m := mapstr.M{}
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return events, fmt.Errorf("could not unmarshal: %w: %v", err, string(raw))
+		}
+		event := beat.Event{}
+		tsString, err := m.GetValue("@timestamp")
+		if err != nil {
+			return events, fmt.Errorf("could not get @timestamp: %w", err)
+		}
+		err = m.Delete("@timestamp")
+		if err != nil {
+			return events, fmt.Errorf("could not remove @timestamp")
+		}
+		ts, err := time.Parse(time.RFC3339, tsString.(string))
+		if err != nil {
+			return events, fmt.Errorf("could not parse timestamp: %w", err)
+		}
+		metaInterface, err := m.GetValue("@metadata")
+		if err != nil {
+			return events, fmt.Errorf("could not get @metadata: %w", err)
+		}
+		meta, ok := metaInterface.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("%v was supposed to be mapstr.", metaInterface)
+		}
+		err = m.Delete("@metadata")
+		if err != nil {
+			return nil, fmt.Errorf("failed to delete @metadata: %w", err)
+		}
+		meta["input_id"] = "input_id"
+		meta["stream_id"] = "stream_id"
+		m.Put("data_stream", map[string]interface{}{"type": "type", "namespace": "namespace", "dataset": "dataset"})
+
+		event.Timestamp = ts
+		event.Meta = meta
+		event.Fields = m
+		events = append(events, &event)
+	}
+	return events, nil
+}
+
 func rtMessagesEvent(m *messages.Event) {
 	b, err := proto.Marshal(m)
 	if err != nil {
@@ -154,6 +199,69 @@ func rtVTMessagesEvent(m *messages.Event) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func rtBeatsVTMessagesEvent(e *beat.Event) {
+	meta, err := helpers.NewValue(e.Meta)
+	if err != nil {
+		panic(err)
+	}
+	fields, err := helpers.NewValue(e.Fields)
+	if err != nil {
+		panic(err)
+	}
+	source := &messages.Source{}
+	ds := &messages.DataStream{}
+	inputIDVal, err := e.Meta.GetValue("input_id")
+	if err != nil {
+		panic(err)
+	}
+	source.InputId, _ = inputIDVal.(string)
+
+	streamIDVal, err := e.Meta.GetValue("stream_id")
+	if err != nil {
+		panic(err)
+	}
+	source.StreamId, _ = streamIDVal.(string)
+
+	dsType, err := e.Fields.GetValue("data_stream.type")
+	if err != nil {
+		panic(err)
+	}
+	ds.Type, _ = dsType.(string)
+
+	dsNamespace, err := e.Fields.GetValue("data_stream.namespace")
+	if err != nil {
+		panic(err)
+	}
+	ds.Namespace, _ = dsNamespace.(string)
+
+	dsDataset, err := e.Fields.GetValue("data_stream.dataset")
+	if err != nil {
+		panic(err)
+	}
+	ds.Dataset, _ = dsDataset.(string)
+	m := &messages.Event{
+		Timestamp:  timestamppb.New(e.Timestamp),
+		Metadata:   meta.GetStructValue(),
+		Fields:     fields.GetStructValue(),
+		Source:     source,
+		DataStream: ds,
+	}
+
+	b, err := m.MarshalVT()
+	if err != nil {
+		panic(err)
+	}
+	newMessage := &messages.Event{}
+	err = newMessage.UnmarshalVT(b)
+	if err != nil {
+		panic(err)
+	}
+	be := &beat.Event{}
+	be.Timestamp = newMessage.Timestamp.AsTime()
+	be.Fields = helpers.AsMap(newMessage.Fields)
+	be.Meta = helpers.AsMap(newMessage.Metadata)
 }
 
 func bytesToMapStr(input [][]byte) ([]*mapstr.M, error) {
@@ -584,90 +692,90 @@ func BenchmarkMarshalUnmarshal(b *testing.B) {
 				}
 			}
 		})
-		b.Run(bm.name+"MapStrStdJSON", func(b *testing.B) {
-			events, err := bytesToMapStr(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtMapStrStdJSON(e)
-				}
-			}
-		})
-		b.Run(bm.name+"ShallowProtobuf", func(b *testing.B) {
-			events, err := bytesToMessagesShallowEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtMessagesShallowEvent(e)
-				}
-			}
-		})
-		b.Run(bm.name+"VTShallowProtobuf", func(b *testing.B) {
-			events, err := bytesToMessagesShallowEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtVTMessagesShallowEvent(e)
-				}
-			}
-		})
-		b.Run(bm.name+"ShallowProtobufFull", func(b *testing.B) {
-			events, err := bytesToMessagesShallowEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtMessagesShallowEventFull(e)
-				}
-			}
-		})
-		b.Run(bm.name+"VTShallowProtobufFull", func(b *testing.B) {
-			events, err := bytesToMessagesShallowEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtVTMessagesShallowEventFull(e)
-				}
-			}
-		})
-		b.Run(bm.name+"ShallowProtobufFullGoJSON", func(b *testing.B) {
-			events, err := bytesToMessagesShallowEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtMessagesShallowEventFullGoJSON(e)
-				}
-			}
-		})
-		b.Run(bm.name+"ShallowVTProtobufFullGoJSON", func(b *testing.B) {
-			events, err := bytesToMessagesShallowEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtVTMessagesShallowEventFullGoJSON(e)
-				}
-			}
-		})
+		// b.Run(bm.name+"MapStrStdJSON", func(b *testing.B) {
+		// 	events, err := bytesToMapStr(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtMapStrStdJSON(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"ShallowProtobuf", func(b *testing.B) {
+		// 	events, err := bytesToMessagesShallowEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtMessagesShallowEvent(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"VTShallowProtobuf", func(b *testing.B) {
+		// 	events, err := bytesToMessagesShallowEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtVTMessagesShallowEvent(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"ShallowProtobufFull", func(b *testing.B) {
+		// 	events, err := bytesToMessagesShallowEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtMessagesShallowEventFull(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"VTShallowProtobufFull", func(b *testing.B) {
+		// 	events, err := bytesToMessagesShallowEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtVTMessagesShallowEventFull(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"ShallowProtobufFullGoJSON", func(b *testing.B) {
+		// 	events, err := bytesToMessagesShallowEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtMessagesShallowEventFullGoJSON(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"ShallowVTProtobufFullGoJSON", func(b *testing.B) {
+		// 	events, err := bytesToMessagesShallowEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtVTMessagesShallowEventFullGoJSON(e)
+		// 		}
+		// 	}
+		// })
 		b.Run(bm.name+"MapStrGoJSON", func(b *testing.B) {
 			events, err := bytesToMapStr(rawBytes)
 			if err != nil {
@@ -680,75 +788,87 @@ func BenchmarkMarshalUnmarshal(b *testing.B) {
 				}
 			}
 		})
-		b.Run(bm.name+"ShallowEventStdJSON", func(b *testing.B) {
-			events, err := bytesToShallowEvents(rawBytes)
+		// b.Run(bm.name+"ShallowEventStdJSON", func(b *testing.B) {
+		// 	events, err := bytesToShallowEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtShallowEventStdJSON(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"ShallowEventGoJSON", func(b *testing.B) {
+		// 	events, err := bytesToShallowEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtShallowEventGoJSON(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"DeepEventStdJSON", func(b *testing.B) {
+		// 	events, err := bytesToDeepEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtDeepEventStdJSON(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"DeepEventSructFormCBORL", func(b *testing.B) {
+		// 	events, err := bytesToDeepEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtDeepEventStructFormCBORL(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"DeepEventGoJSON", func(b *testing.B) {
+		// 	events, err := bytesToDeepEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtDeepEventGoJSON(e)
+		// 		}
+		// 	}
+		// })
+		// b.Run(bm.name+"DeepEventCBORL", func(b *testing.B) {
+		// 	events, err := bytesToDeepEvents(rawBytes)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		for _, e := range events {
+		// 			rtDeepEventCBORL(e)
+		// 		}
+		// 	}
+		// })
+		b.Run(bm.name+"BeatVTmessageEvent", func(b *testing.B) {
+			events, err := bytesToBeatEvents(rawBytes)
 			if err != nil {
 				panic(err)
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				for _, e := range events {
-					rtShallowEventStdJSON(e)
-				}
-			}
-		})
-		b.Run(bm.name+"ShallowEventGoJSON", func(b *testing.B) {
-			events, err := bytesToShallowEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtShallowEventGoJSON(e)
-				}
-			}
-		})
-		b.Run(bm.name+"DeepEventStdJSON", func(b *testing.B) {
-			events, err := bytesToDeepEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtDeepEventStdJSON(e)
-				}
-			}
-		})
-		b.Run(bm.name+"DeepEventSructFormCBORL", func(b *testing.B) {
-			events, err := bytesToDeepEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtDeepEventStructFormCBORL(e)
-				}
-			}
-		})
-		b.Run(bm.name+"DeepEventGoJSON", func(b *testing.B) {
-			events, err := bytesToDeepEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtDeepEventGoJSON(e)
-				}
-			}
-		})
-		b.Run(bm.name+"DeepEventCBORL", func(b *testing.B) {
-			events, err := bytesToDeepEvents(rawBytes)
-			if err != nil {
-				panic(err)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, e := range events {
-					rtDeepEventCBORL(e)
+					rtBeatsVTMessagesEvent(e)
 				}
 			}
 		})
